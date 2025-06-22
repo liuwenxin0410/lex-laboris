@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>工时壁垒</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:5001;">
+    <style>
+        :root { --bg-color: #1e1e1e; --sidebar-bg: #252526; --text-color: #cccccc; --text-color-light: #9cdcfe; --border-color: #333333; --active-color: #4ec9b0; --inactive-color: #f44747; --idle-color: #f8b886; }
+        html, body { height: 100vh; margin: 0; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; font-size: 14px; background-color: var(--bg-color); color: var(--text-color); overflow: hidden; user-select: none; }
+        .container { display: flex; height: 100vh; }
+        .sidebar { width: 320px; background-color: var(--sidebar-bg); padding: 24px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); flex-shrink: 0; overflow-y: auto; }
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        h1, h2 { color: white; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin: 0 0 16px 0; flex-shrink: 0; }
+        h1 { font-size: 1.8em; text-align: center; } h2 { font-size: 1.1em; color: #d4d4d4; }
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .status-box { text-align: center; } .status-label { display: block; font-size: 0.9em; margin-bottom: 8px; color: #888; }
+        .status-indicator { font-weight: bold; padding: 6px 12px; border-radius: 5px; display: inline-block; min-width: 70px; }
+        .status-indicator.active { background-color: var(--active-color); color: black; } .status-indicator.inactive { background-color: var(--inactive-color); color: white; } .status-indicator.idle { background-color: var(--idle-color); color: black; }
+        button { width: 100%; padding: 12px; font-size: 1.1em; margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; background-color: #3c3c3c; color: white; }
+        button:hover:not(:disabled) { background-color: #4f4f4f; } button:disabled { background-color: #2a2a2a; color: #666; cursor: not-allowed; }
+        .form-section { display: flex; flex-direction: column; gap: 10px; } .form-section label { font-size: 0.9em; color: #aaa; }
+        .form-section input, .form-section select { background-color: #3c3c3c; color: white; border: 1px solid var(--border-color); padding: 8px; border-radius: 5px; width: calc(100% - 18px); }
+        .status-message { font-size: 0.9em; margin-top: 8px; text-align: center; min-height: 1.2em; word-wrap: break-word; }
+        .log-header { padding: 12px 24px; background-color: var(--sidebar-bg); border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+        .log-container { flex-grow: 1; overflow-y: auto; padding: 0 24px; }
+        .log-item { display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
+        .log-item span { padding: 0 8px; white-space: nowrap; }
+        .timestamp { width: 80px; color: #888; text-align: right; flex-shrink: 0; } 
+        .event-type { width: 80px; font-weight: 500; flex-shrink: 0; }
+        .event-keyboard-press { color: #d7ba7d; } .event-status-change { color: #f8b886; }
+        .event-app-session { color: #4ec9b0; } .event-heartbeat { color: #6a9955; }
+        .event-screenshot-manual, .event-screenshot-auto { color: #b5cea8; } .event-environment-snapshot { color: #569cd6; font-weight: bold; }
+        .event-file-created, .event-file-modified, .event-file-moved, .event-file-deleted { color: #9a7ecc; }
+        .details { flex-grow: 1; color: #9cdcfe; white-space: normal; word-break: break-all; } 
+        .hash { width: 90px; font-family: 'Courier New', monospace; color: #6a9955; text-align: right; flex-shrink: 0; }
+        a { color: var(--text-color-light); text-decoration: none; } a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h1>工时壁垒</h1>
+            <div class="status-grid">
+                <div class="status-box"><span class="status-label">程序状态</span><span id="status-text" class="status-indicator inactive">未运行</span></div>
+                <div class="status-box"><span class="status-label">用户活动</span><span id="idle-status-text" class="status-indicator inactive">未知</span></div>
+            </div>
+            <h2>控制面板</h2>
+            <button id="start-btn">开始新会话</button>
+            <button id="stop-btn" disabled>结束会话</button>
+            <button id="manual-screenshot-btn">截图 (区域: Ctrl+Shift+A / 全屏: Ctrl+Shift+S)</button>
+            
+            <h2 style="margin-top: 20px;">生成报告</h2>
+            <div class="form-section">
+                <label for="userName">你的姓名:</label>
+                <input type="text" id="userName" name="userName" placeholder="例如：李雷">
+                <button id="generate-report-btn" disabled>生成上次会话的报告</button>
+                <div id="report-status" class="status-message">请先完成一次“开始-结束”会话。</div>
+            </div>
+            
+            <!-- 【移除】整个数据管理区块 -->
+            <!--
+            <h2 style="margin-top: 20px;">数据管理</h2>
+            <div class="form-section">
+                 <p style="font-size: 0.85em; color: #aaa; margin: 0 0 10px 0;">每次开始新会话时，旧数据会被自动归档。此按钮将永久删除所有数据（包括归档）。</p>
+                 <button id="delete-db-btn" style="background-color: #8b0000;">删除所有数据</button>
+                 <div id="db-status" class="status-message"></div>
+            </div>
+            -->
+        </aside>
+        <main class="main-content">
+            <header class="log-header"><h2>实时活动日志</h2></header>
+            <div class="log-container"><div id="events-log"></div></div>
+        </main>
+    </div>
+    <script src="./dist/renderer.js"></script>
+</body>
+</html>
