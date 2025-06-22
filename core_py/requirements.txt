@@ -1,0 +1,12 @@
+Flask==2.2.2
+SQLAlchemy==1.4.41
+pynput==1.7.6
+Pillow==9.2.0
+watchdog==2.1.9
+psutil==5.9.4
+pytz==2023.3
+reportlab==4.0.9
+# 特定平台的库
+pywin32; platform_system == "Windows"
+pyobjc; platform_system == "Darwin"
+python-xlib; platform_system == "Linux"

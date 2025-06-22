@@ -66,4 +66,8 @@ lex-laboris-final/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── webpack.config.js
+<<<<<<< HEAD
 └── setup.py
+=======
+└── setup.py
+>>>>>>> master
